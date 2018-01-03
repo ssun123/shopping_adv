@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+	PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+	"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+	<mapper namespace="com.kt.ai.commerce.login.mapper.LoginApiMapper">
+
+	<select id="login" parameterType="map" resultType="LoginVo">
+
+		SELECT user_key as userKey, user_gender as userGender
+		FROM user_mst
+		WHERE user_id = #{userId,jdbcType=VARCHAR}
+		AND user_pwd = #{userPwd,jdbcType=VARCHAR}
+		
+	</select>
+
+	<select id="selectUserKey" parameterType="map" resultType="int">
+		SELECT max(user_key)
+		FROM user_mst
+		WHERE user_id = #{userId,jdbcType=VARCHAR}
+	</select>
+
+	<update id="deviceUpdatePush" parameterType="map" >
+		update user_device set push_key = #{pushKey,jdbcType=VARCHAR},reg_date=current_timestamp
+		where device_id = #{adid,jdbcType=VARCHAR}
+		and user_key = #{userKey,jdbcType=NUMERIC}
+	</update>
+
+	<insert id="deviceInsert" parameterType="map">
+		insert into user_device  (user_key,device_type,device_id,push_key,reg_date)
+						values (#{userKey,jdbcType=NUMERIC},#{deviceType,jdbcType=VARCHAR},#{adid,jdbcType=VARCHAR},#{pushKey,jdbcType=VARCHAR},current_timestamp)
+	</insert>
+
+	<select id="userCheck" parameterType="map" resultType="int">
+
+		SELECT count(*)
+		FROM user_mst
+		WHERE user_id = #{userId,jdbcType=VARCHAR}
+		
+	</select>
+
+	<insert id="userInsert" parameterType="map">
+ 		insert into user_mst  (user_key,user_id,user_pwd,user_gender,user_birth_year)
+		select COALESCE(max(user_key),0) +1 , #{userId,jdbcType=VARCHAR} , #{userPwd,jdbcType=VARCHAR} , #{userGender,jdbcType=VARCHAR} ,#{userBirthYear,jdbcType=VARCHAR} from user_mst
+	</insert>
+
+	</mapper>

@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+	PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+	"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.kt.ai.commerce.buy.mapper.BuyApiMapper">
+
+	<select id="buyList" parameterType="map" resultType="BuyVo">
+		SELECT 
+			a.user_key, 
+			a.buy_no as buyNo,
+			b.prod_id as productId, 
+			b.prod_img_url_m as imgUrl,
+			b.prod_name as productName,
+			b.prod_price as productCost,
+			CASE 
+				WHEN coalesce(c.prod_id,'N')='N' THEN 'N' 
+				ELSE 'Y' 
+				END as favoriteYn,
+			b.prod_url_m as detailUrl,
+			a.delivery_state as deliveryState
+		FROM user_buy a 
+		INNER JOIN tb_product b on a.prod_id = b.prod_id
+		LEFT JOIN user_favorite c on a.prod_id = c.prod_id
+		WHERE a.user_key = #{userKey,jdbcType=VARCHAR}
+	</select>
+	
+	<insert id="buy" parameterType="map">
+		INSERT INTO user_buy(user_key, prod_id, buy_no,delivery_state)
+    	VALUES (#{userKey,jdbcType=NUMERIC}, #{productId,jdbcType=VARCHAR}, #{buyNo,jdbcType=VARCHAR},'0')
+	</insert>
+	
+</mapper>

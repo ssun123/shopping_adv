@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+	PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+	"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.kt.ai.commerce.pantry.mapper.PantryApiMapper">
+	
+	<select id="selectPantryCategoryList" parameterType="map" resultType="PantryVo">
+
+		SELECT category as category, img_url as ImgUrl
+		FROM pantry_category
+		WHERE ranking = 0
+	
+	</select>
+	
+	<select id="selectPantryProdList" parameterType="map" resultType="PantryVo">
+
+		SELECT prod_id as prodId, prod_name as prodName, prod_price as prodPrice, img_url as ImgUrl
+		FROM pantry_category
+		WHERE category = #{category, jdbcType=VARCHAR}
+		AND use_yn='Y'
+		ORDER BY ranking
+		
+	</select>
+	<!-- 간편구매 상품 설정/삭제 -->
+	<insert id="pantryProdInsert" parameterType="map">
+		INSERT into user_pantry  (user_key,prod_id,category,prod_brand)
+		SELECT #{userKey,jdbcType=NUMERIC},#{prodId,jdbcType=VARCHAR},category, prod_brand
+		FROM pantry_category
+		WHERE prod_id = #{prodId,jdbcType=VARCHAR}
+		ON CONFLICT (user_key,category) DO UPDATE
+		SET prod_id = #{prodId,jdbcType=VARCHAR}, prod_brand = (SELECT prod_brand FROM pantry_category WHERE prod_id =#{prodId,jdbcType=VARCHAR})
+
+	</insert>
+	
+	<delete id="pantryProdDelete" parameterType="map" >
+		DELETE from user_pantry
+		WHERE user_key = #{userKey,jdbcType=VARCHAR}
+		AND prod_id = #{prodId,jdbcType=VARCHAR}
+	</delete>
+		
+	<select id="pantrySetList" parameterType="map" resultType="PantryVo">
+		SELECT pc.category as category, up.prod_id as prodId, pc.prod_name as prodName, pc.prod_price as prodPrice, pc.img_url as imgUrl
+		FROM user_pantry as up JOIN pantry_category as pc on up.prod_id = pc.prod_id
+		WHERE up.user_key = #{userKey,jdbcType=VARCHAR}
+		
+	</select>
+</mapper>

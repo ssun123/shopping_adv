@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+	PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+	"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+	<mapper namespace="com.kt.ai.commerce.log.mapper.LogMapper">
+
+	<insert id="logInsert" parameterType="map">
+		insert into user_log  (user_key,device_type,now_page,  befor_page,req_msg,req_date)
+						values (#{userKey,jdbcType=NUMERIC},#{deviceType,jdbcType=VARCHAR},#{nowPage,jdbcType=VARCHAR},#{beforPage,jdbcType=VARCHAR},#{reqMsg,jdbcType=VARCHAR},current_timestamp)
+	</insert>
+
+	</mapper>

@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+	PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+	"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.kt.ai.commerce.visual.mapper.VisualApiMapper">
+	
+	<select id="selectVisualList" parameterType="map" resultType="VisualVo">
+
+		SELECT visual_id as visualId , img_src as visualImgUrl
+		FROM tb_visual_shopping
+		WHERE depth_no = #{depthNo,jdbcType=VARCHAR}
+		AND parents_visual_id = #{parentsVisualId,jdbcType=VARCHAR}
+		ORDER BY visual_id
+	</select>
+
+	<select id="selectVisualResultList" parameterType="map" resultType="prodListVo">
+
+		SELECT tp.prod_id as productId , prod_img_url_m as imgUrl ,prod_name as productName ,prod_price as productCost,prod_url_m as detailUrl
+		, partner_name as channelName , brand , logo_url as logoUrl , company as productMake,case when uf.prod_id is null then 'N' else 'Y' end favoriteYn
+		FROM tb_visual_shopping_result vsr 
+		INNER JOIN tb_product tp 
+		ON vsr.prod_id = tp.prod_id
+		LEFT JOIN (select prod_id from user_favorite where user_key = #{userKey,jdbcType=NUMERIC} ) uf 
+		on tp.prod_id = uf.prod_id
+		WHERE result_id = #{imgIdStr,jdbcType=VARCHAR}
+	</select>
+	
+	<select id="visualMax" parameterType="map" resultType="int">
+		SELECt max(depth_no) as visualMax
+		FROM public.tb_visual_shopping
+	</select>
+	
+</mapper>

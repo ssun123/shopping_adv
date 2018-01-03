@@ -1,0 +1,608 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+	PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+	"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+	<mapper namespace="com.kt.ai.commerce.tvApp.mapper.TVAppApiMapper">
+
+	<select id="selectPushKey" parameterType="map" resultType="PushVo">
+
+		SELECT user_key as userKey , device_id as deviceId, push_key as pushKey,'지니쇼핑' as pushTitle , 'TV에서 상세보기 요청을 하셨습니다.' as pushMsg , #{productId,jdbcType=VARCHAR} as prodId
+		, (select prod_url_m from tb_product where prod_id = #{productId,jdbcType=VARCHAR}) as prodUrl
+		FROM user_device
+		WHERE user_key = #{userKey,jdbcType=VARCHAR}
+		AND device_type = 'A'
+	</select>
+
+	<select id="selectPushKeyByDeviceId" parameterType="map" resultType="PushVo">
+
+		SELECT user_key as userKey , device_id as deviceId, push_key as pushKey,'지니쇼핑' as pushTitle , 'TV에서 상세보기 요청을 하셨습니다.' as pushMsg , #{productId,jdbcType=VARCHAR} as prodId
+		, (select prod_url_m from tb_product where prod_id = #{productId,jdbcType=VARCHAR}) as prodUrl
+		FROM user_device
+		WHERE user_key = (SELECT user_key FROM user_device WHERE device_id = #{tvId,jdbcType=VARCHAR})
+		AND device_type = 'A'
+	</select>
+
+	<select id="airProdId" parameterType="map" resultType="String">
+
+		SELECT prod_id 
+		FROM homeshopping_prod
+		WHERE parthner_name = #{channelName,jdbcType=VARCHAR}
+		AND #{tvTime,jdbcType=VARCHAR} BETWEEN start_date AND end_date
+	</select>
+
+
+	<select id="prodListBySearch" parameterType="map" resultType="prodListVo">
+		SELECT 
+			tp.shop_code as productType,
+			tp.prod_id as productId,
+			tp.prod_img_url_m as imgUrl,
+			tp.prod_name as productName,
+			tp.prod_price as productCost, 
+			CASE
+			 WHEN tp.shop_code = '7' THEN tv.parthner_name 
+			 ELSE tp.partner_name
+			END as channelName,
+			CASE 
+			 WHEN tp.shop_code = '7' THEN tv.ch_no 
+			ELSE ''
+			END as channelNo ,
+			tp.brand  as brand,
+			tp.logo_url as logoUrl,
+			tp.country_origin as productMake,
+			tv.start_date as airStartTime,
+			tv.end_date as airEndTime
+		FROM tb_product tp 
+		<if test="searchColor != null">
+			INNER JOIN 
+			(
+				SELECT prod_id FROM tb_product_color 
+				WHERE color_name IN 
+		        <foreach collection="searchColor" item="iColor"  open="(" close=")" separator=",">
+		            #{iColor,jdbcType=VARCHAR}
+		        </foreach>
+				 
+				GROUP BY prod_id
+			) as tpc
+			ON tp.prod_id = tpc.prod_id
+		</if>
+		<if test="searchStyle != null">
+			
+			INNER JOIN 
+			(
+				SELECT prod_id FROM tb_product_style 
+				WHERE 1=1 AND
+				<foreach collection="searchStyle" item="iStyle"  open="(" close=")" separator="OR">
+		           style_name = #{iStyle,jdbcType=VARCHAR}
+		        </foreach>
+				
+				GROUP BY prod_id
+<![CDATA[				HAVING count(*) >= #{searchStyleCount,jdbcType=NUMERIC} ]]>	
+			) as tps
+			ON tp.prod_id = tps.prod_id
+		</if>
+		LEFT JOIN homeshopping_prod tv 
+				ON tp.prod_id = tv.prod_id
+				 
+		<where>
+		<if test="searchCategory != null">
+			 tp.cate3 IN 
+		        <foreach collection="searchCategory" item="iCategory"  open="(" close=")" separator=",">
+		            #{iCategory,jdbcType=VARCHAR}
+		        </foreach>
+		</if>
+		<if test="searchGender != null">
+			AND tp.gender IN 
+		        <foreach collection="searchGender" item="iGender"  open="(" close=")" separator=",">
+		            #{iGender,jdbcType=VARCHAR}
+		        </foreach>
+		</if>
+		
+		</where>
+		order by tp.prod_ranking
+		limit 30
+	</select>
+
+	<select id="recommInfo" parameterType="map" resultType="TVAppVo">
+		 SELECT 
+			 sr.recommend_type as reCommendType,
+			 sr.recommend_ver as reCommendVer,
+			 sr.use_yn, 
+			 rv.recommend_title as reCommendName,
+			 rv.display_color as reCommendColor
+		 FROM service_recommend sr
+		 INNER JOIN recommend_ver rv 
+		 	ON sr.recommend_type = rv.recommend_type 
+		 	AND sr.recommend_ver = rv.recommend_ver 
+	 	WHERE sr.use_yn = 'Y'
+		 	AND sr.recommend_type like 'TV%'
+	</select>
+
+	<select id="recommInfoOne" parameterType="map" resultType="String">
+		 SELECT 
+			 
+			 sr.recommend_ver as reCommendVer
+			
+		 FROM service_recommend sr
+		 INNER JOIN recommend_ver rv 
+		 	ON sr.recommend_type = rv.recommend_type 
+		 	AND sr.recommend_ver = rv.recommend_ver 
+	 	WHERE sr.use_yn = 'Y'
+		 	AND sr.recommend_type = #{reCommendType,jdbcType=VARCHAR}
+		 
+	</select>
+	
+	<select id="selectRecomType" parameterType="map" resultType="String">
+		select srr.recommend_type
+		from tb_product tp
+		Join service_recommend_result srr on tp.prod_id = srr.prod_id
+		where tp.prod_id = #{prodId,jdbcType=VARCHAR}
+		and srr.recommend_id = #{deviceId,jdbcType=VARCHAR}
+		limit 1
+	</select>
+
+	<select id="selectTvId" parameterType="map" resultType="String">
+		SELECT 
+			device_id 
+		FROM user_device 
+		WHERE user_key = #{userKey,jdbcType=VARCHAR}
+		AND device_type = 'T'
+		LIMIT 1
+	</select>
+
+	<select id="prodListByRecomm" parameterType="map" resultType="prodListVo">
+		SELECT 
+		    tp.shop_code as productType,
+		    tp.prod_id as productId,
+		    tp.prod_img_url_m as imgUrl,
+		    tp.prod_name as productName,
+		    tp.prod_price as productCost,
+		    CASE
+			WHEN tp.shop_code = '7' THEN tv.parthner_name 
+			ELSE tp.partner_name
+			END as channelName,
+			CASE 
+			 WHEN tp.shop_code = '7' THEN tv.ch_no 
+			ELSE ''
+			END as channelNo ,
+			tp.brand as brand,
+			tp.logo_url as logoUrl,
+			tp.country_origin as productMake,
+			tp.video_url as videoUrl,
+			tv.start_date as airStartTime,
+			tv.end_date as airEndTime
+			, CASE WHEN tv.start_date > to_char(now(),'YYYY/MM/DD HH24:MI:SS') THEN 'Y'
+			 WHEN tv.start_date is null THEN 'W'
+			 ELSE 'N' END as airReadyYn
+		FROM service_recommend_result srr
+		INNER JOIN tb_product tp ON srr.prod_id = tp.prod_id 
+		LEFT JOIN homeshopping_prod tv 
+				ON srr.prod_id = tv.prod_id
+		WHERE  srr.recommend_type = #{reCommendType,jdbcType=VARCHAR}
+		AND srr.recommend_ver = #{reCommendVer,jdbcType=VARCHAR}
+		AND srr.recommend_id = #{recommendId,jdbcType=VARCHAR}
+		AND COALESCE(tv.end_date,'999999999999999') > to_char(now(),'YYYY/MM/DD HH24:MI:SS')
+		 
+		<if test="searchTime != null">
+			AND srr.recommend_time = #{searchTime,jdbcType=VARCHAR}
+		</if>
+		 
+		ORDER BY srr.ranking ,  srr.reg_date DESC		
+		LIMIT 20
+ 	</select>
+ 	
+	<select id="prodListByRecommDetail" parameterType="map" resultType="prodListVo">
+		SELECT 
+		    tp.shop_code as productType,
+		    tp.prod_id as productId,
+		    tp.prod_img_url_m as imgUrl,
+		    tp.prod_name as productName,
+		    tp.prod_price as productCost,
+		    CASE
+			WHEN tp.shop_code = '7' THEN tv.parthner_name 
+			ELSE tp.partner_name
+			END as channelName,
+			CASE 
+			 WHEN tp.shop_code = '7' THEN tv.ch_no 
+			ELSE ''
+			END as channelNo ,
+			tp.brand as brand,
+			tp.logo_url as logoUrl,
+			tp.country_origin as productMake,
+			tp.video_url as videoUrl,
+			tv.start_date as airStartTime,
+			tv.end_date as airEndTime
+			, CASE WHEN tv.start_date > to_char(now(),'YYYY/MM/DD HH24:MI:SS') THEN 'Y' 
+			
+			 WHEN tv.end_date <![CDATA[ < ]]> to_char(now(),'YYYY/MM/DD HH24:MI:SS')  THEN 'X'
+			
+			WHEN tv.start_date is null THEN 'W' ELSE 'N' END as airReadyYn
+		FROM service_recommend_result srr
+		INNER JOIN tb_product tp ON srr.prod_id = tp.prod_id 
+		LEFT JOIN homeshopping_prod tv  
+				ON srr.prod_id = tv.prod_id
+		WHERE  srr.recommend_type = #{reCommendType,jdbcType=VARCHAR}
+		AND srr.recommend_ver = #{reCommendVer,jdbcType=VARCHAR}
+		AND srr.recommend_id = #{recommendId,jdbcType=VARCHAR}
+	
+		AND tp.prod_id = #{prodId,jdbcType=VARCHAR}
+		 
+		<if test="searchTime != null">
+			AND srr.recommend_time = #{searchTime,jdbcType=VARCHAR}
+		</if>
+		 
+		ORDER BY srr.ranking ,  srr.reg_date DESC		
+		LIMIT 20
+ 	</select>
+
+	<select id="prodListByRecommHigh" parameterType="map" resultType="prodListVo">
+		SELECT 
+		    tp.shop_code as productType,
+		    tp.prod_id as productId,
+		    tp.prod_img_url_m as imgUrl,
+		    tp.prod_name as productName,
+		    tp.prod_price as productCost,
+		    CASE
+			WHEN tp.shop_code = '7' THEN tv.parthner_name 
+			ELSE tp.partner_name
+			END as channelName,
+			CASE 
+			 WHEN tp.shop_code = '7' THEN tv.ch_no 
+			ELSE ''
+			END as channelNo ,
+			tp.brand as brand,
+			tp.logo_url as logoUrl,
+			tp.country_origin as productMake,
+			tp.video_url as videoUrl,
+			tv.start_date as airStartTime,
+			tv.end_date as airEndTime
+		FROM tb_product tp  
+		INNER JOIN 
+		(
+		select prod_id from user_view_product where user_key = #{userKey,jdbcType=NUMERIC}
+		group by prod_id
+		)
+		uvp ON uvp.prod_id = tp.prod_id
+		LEFT JOIN homeshopping_prod tv 
+				ON tp.prod_id = tv.prod_id
+		WHERE  COALESCE(tv.end_date,'999999999999999') > to_char(now(),'YYYY/MM/DD HH24:MI:SS')
+		AND  tp.participation_type = 'H'
+		LIMIT 20
+ 	</select>
+ 	
+	<select id="prodListByRecommHighDetail" parameterType="map" resultType="prodListVo">
+		SELECT 
+		    tp.shop_code as productType,
+		    tp.prod_id as productId,
+		    tp.prod_img_url_m as imgUrl,
+		    tp.prod_name as productName,
+		    tp.prod_price as productCost,
+		    CASE
+			WHEN tp.shop_code = '7' THEN tv.parthner_name 
+			ELSE tp.partner_name
+			END as channelName,
+			CASE 
+			 WHEN tp.shop_code = '7' THEN tv.ch_no 
+			ELSE ''
+			END as channelNo ,
+			tp.brand as brand,
+			tp.logo_url as logoUrl,
+			tp.country_origin as productMake,
+			tp.video_url as videoUrl,
+			tv.start_date as airStartTime,
+			tv.end_date as airEndTime
+		FROM tb_product tp  
+		INNER JOIN 
+		(
+		select prod_id from user_view_product where user_key = #{userKey,jdbcType=NUMERIC}
+		group by prod_id
+		)
+		uvp ON uvp.prod_id = tp.prod_id
+		LEFT JOIN homeshopping_prod tv 
+				ON tp.prod_id = tv.prod_id
+		WHERE  
+		tp.participation_type = 'H'
+		AND tp.prod_id = #{prodId,jdbcType=VARCHAR}
+		LIMIT 20
+ 	</select>
+ 	
+	<select id="prodListByRecommLowDetail" parameterType="map" resultType="prodListVo">
+		SELECT 
+		    tp.shop_code as productType,
+		    tp.prod_id as productId,
+		    tp.prod_img_url_m as imgUrl,
+		    tp.prod_name as productName,
+		    tp.prod_price as productCost,
+		    CASE
+			WHEN tp.shop_code = '7' THEN tv.parthner_name 
+			ELSE tp.partner_name
+			END as channelName,
+			CASE 
+			 WHEN tp.shop_code = '7' THEN tv.ch_no 
+			ELSE ''
+			END as channelNo ,
+			tp.brand as brand,
+			tp.logo_url as logoUrl,
+			tp.country_origin as productMake,
+			tp.video_url as videoUrl,
+			tv.start_date as airStartTime,
+			tv.end_date as airEndTime
+		FROM tb_product tp  
+		INNER JOIN 
+		(
+		select prod_id from user_view_product where user_key = #{userKey,jdbcType=NUMERIC}
+		group by prod_id
+		)
+		uvp ON uvp.prod_id = tp.prod_id
+		LEFT JOIN homeshopping_prod tv 
+				ON tp.prod_id = tv.prod_id
+		WHERE  
+		tp.participation_type = 'L'
+		AND tp.prod_id = #{prodId,jdbcType=VARCHAR}
+		LIMIT 20
+ 	</select>
+
+	<select id="prodListBySearchText" parameterType="map" resultType="prodListVo">
+		
+		SELECT 
+		    tp.shop_code as productType,
+		    tp.prod_id as productId,
+		    tp.prod_img_url_m as imgUrl,
+		    tp.prod_name as productName,
+		    tp.prod_price as productCost,
+		    CASE
+			WHEN tp.shop_code = '7' THEN tv.parthner_name 
+			ELSE tp.partner_name
+			END as channelName,
+			CASE 
+			 WHEN tp.shop_code = '7' THEN tv.ch_no 
+			ELSE ''
+			END as channelNo ,
+			tp.brand as brand,
+			tp.logo_url as logoUrl,
+			tp.country_origin as productMake,
+			tp.video_url as videoUrl,
+			tv.start_date as airStartTime,
+			tv.end_date as airEndTime
+			, CASE WHEN tv.start_date > to_char(now(),'YYYY/MM/DD HH24:MI:SS') THEN 'Y'
+			 WHEN tv.start_date is null THEN 'W'
+			 ELSE 'N' END as airReadyYn
+		FROM tb_product tp 
+		LEFT JOIN homeshopping_prod tv 
+				ON tp.prod_id = tv.prod_id
+		WHERE 
+		tp.prod_name like '%'||#{searchText,jdbcType=VARCHAR}||'%'
+		AND tp.use_yn = 'Y'
+		AND COALESCE(tv.end_date,'999999999999999') > to_char(now(),'YYYY/MM/DD HH24:MI:SS')
+		LIMIT 9999
+	</select>
+
+	<select id="imgListByRecommTrend" parameterType="map" resultType="prodListVo">
+		
+	SELECT 
+	tp.shop_code as productType,
+	tp.prod_id as productId,
+	tp.prod_img_url_m as imgUrl,
+	tp.prod_name as productName,
+	tp.prod_price as productCost,
+	tp.brand as brand,
+	tp.logo_url as logoUrl,
+	tp.country_origin as productMake,
+	tp.video_url as videoUrl,
+	mp.ranking
+	FROM matching_product mp  
+	JOIN tb_product tp ON tp.prod_id = mp.rec_prod_id 		
+	WHERE 		
+	 mp.prod_id =   #{prodId,jdbcType=VARCHAR}
+	 AND mp.rec_type =  #{reCommendType,jdbcType=VARCHAR}
+	ORDER BY mp.ranking 
+	LIMIT 5
+	</select>
+
+	<select id="prodListByRecommTrend" parameterType="map" resultType="prodListVo">
+		
+	SELECT 
+	tp.shop_code as productType,
+	tp.prod_id as productId,
+	tp.prod_img_url_m as imgUrl,
+	tp.prod_name as productName,
+	tp.prod_price as productCost,
+	CASE
+	WHEN tp.shop_code = '7' THEN tv.parthner_name 
+	ELSE tp.partner_name
+	END as channelName,
+	CASE 
+	 WHEN tp.shop_code = '7' THEN tv.ch_no 
+	ELSE ''
+	END as channelNo ,
+	tp.brand as brand,
+	tp.logo_url as logoUrl,
+	tp.country_origin as productMake,
+	tp.video_url as videoUrl,
+	tv.start_date as airStartTime,
+	tv.end_date as airEndTime
+	, CASE WHEN tv.start_date > to_char(now(),'YYYY/MM/DD HH24:MI:SS') THEN 'Y'
+	 WHEN tv.start_date is null THEN 'W'
+	 ELSE 'N' END as airReadyYn
+	FROM tb_product tp 
+	LEFT JOIN homeshopping_prod tv 
+		ON tp.prod_id = tv.prod_id
+	JOIN matching_product mp ON tp.prod_id = mp.rec_prod_id 		
+	WHERE 		
+	tp.use_yn = 'Y'
+	AND mp.prod_id =  #{prodId,jdbcType=VARCHAR}	
+	AND COALESCE(tv.end_date,'999999999999999') > to_char(now(),'YYYY/MM/DD HH24:MI:SS')
+	ORDER BY mp.ranking 
+	LIMIT 9999
+	</select>
+	
+	<select id="prodListBySearchTextDetail" parameterType="map" resultType="prodListVo">
+		
+		SELECT 
+		    tp.shop_code as productType,
+		    tp.prod_id as productId,
+		    tp.prod_img_url_m as imgUrl,
+		    tp.prod_name as productName,
+		    tp.prod_price as productCost,
+		    CASE
+			WHEN tp.shop_code = '7' THEN tv.parthner_name 
+			ELSE tp.partner_name
+			END as channelName,
+			CASE 
+			 WHEN tp.shop_code = '7' THEN tv.ch_no 
+			ELSE ''
+			END as channelNo ,
+			tp.brand as brand,
+			tp.logo_url as logoUrl,
+			tp.country_origin as productMake,
+			tp.video_url as videoUrl,
+			tv.start_date as airStartTime,
+			tv.end_date as airEndTime
+			, CASE WHEN tv.start_date > to_char(now(),'YYYY/MM/DD HH24:MI:SS') THEN 'Y'
+			 WHEN tv.start_date is null THEN 'W'
+			 ELSE 'N' END as airReadyYn
+		FROM tb_product tp 
+		LEFT JOIN homeshopping_prod tv 
+				ON tp.prod_id = tv.prod_id
+		WHERE 
+			tp.prod_id = #{prodId,jdbcType=VARCHAR}
+		AND tp.use_yn = 'Y'
+		AND COALESCE(tv.end_date,'999999999999999') > to_char(now(),'YYYY/MM/DD HH24:MI:SS')
+
+	</select>
+	
+	<select id="prodListByRecommLow" parameterType="map" resultType="prodListVo">
+		SELECT 
+		    tp.shop_code as productType,
+		    tp.prod_id as productId,
+		    tp.prod_img_url_m as imgUrl,
+		    tp.prod_name as productName,
+		    tp.prod_price as productCost,
+		    CASE
+			WHEN tp.shop_code = '7' THEN tv.parthner_name 
+			ELSE tp.partner_name
+			END as channelName,
+			CASE 
+			 WHEN tp.shop_code = '7' THEN tv.ch_no 
+			ELSE ''
+			END as channelNo ,
+			tp.brand as brand,
+			tp.logo_url as logoUrl,
+			tp.country_origin as productMake,
+			tp.video_url as videoUrl,
+			tv.start_date as airStartTime,
+			tv.end_date as airEndTime
+		FROM tb_product tp  
+		INNER JOIN 
+		(
+		select prod_id from user_view_product where user_key = #{userKey,jdbcType=NUMERIC}
+		group by prod_id
+		)
+		uvp ON uvp.prod_id = tp.prod_id 
+		LEFT JOIN homeshopping_prod tv 
+				ON tp.prod_id = tv.prod_id
+		WHERE  COALESCE(tv.end_date,'999999999999999') > to_char(now(),'YYYY/MM/DD HH24:MI:SS')
+		AND  tp.participation_type = 'L'
+		LIMIT 20
+ 	</select>
+	
+	<insert id="pushHistoryInsert" parameterType="PushVo">
+		INSERT INTO push_history (user_key , push_key,push_title,push_msg,prod_id,reg_date)
+		values (#{userKey,jdbcType=NUMERIC},#{pushKey,jdbcType=VARCHAR},#{pushTitle,jdbcType=VARCHAR},#{pushMsg,jdbcType=VARCHAR},#{prodId,jdbcType=VARCHAR},now() )
+	</insert>
+
+	<select id="liveContent" parameterType="map" resultType="prodListVo">
+<![CDATA[
+		SELECT 
+		    tp.shop_code as productType,
+		    tp.prod_id as productId,
+		    tp.prod_img_url_m as imgUrl,
+		    tp.prod_name as productName,
+		    tp.prod_price as productCost,
+		    CASE
+			WHEN tp.shop_code = '7' THEN tv.parthner_name 
+			ELSE tp.partner_name
+			END as channelName,
+			CASE 
+			 WHEN tp.shop_code = '7' THEN tv.ch_no 
+			ELSE ''
+			END as channelNo ,
+			tp.brand as brand,
+			tp.logo_url as logoUrl,
+			tp.country_origin as productMake,
+			ht.telno as videoUrl,
+			tv.start_date as airStartTime,
+			tv.end_date as airEndTime
+		FROM tb_product tp  
+		INNER JOIN homeshopping_prod tv 
+				ON tp.prod_id = tv.prod_id
+		INNER JOIN homeshopping_telno ht
+				ON tv.parthner_name = ht.parthner_name
+		WHERE tv.start_date <= to_char(now(),'YYYY/MM/DD HH24:MI:SS')
+		AND tv.end_date >= to_char(now(),'YYYY/MM/DD HH24:MI:SS')
+		AND tv.ch_no = #{channelNo,jdbcType=VARCHAR}
+		LIMIT 1
+]]>
+	</select>
+	
+		<!-- 0515 api 연예인 검색-->
+	<select id="prodSearchCeleb" parameterType="map" resultType="prodListVo">
+		SELECT 
+			distinct on(cp.prod_code)
+			cp.prog_title as progTitle,
+			cp.char_name as characterName,
+			cp.prod_type as prodType,
+			cp.brand as brand,
+			cp.prod_code as prodCode,
+			cp.img_url as imgUrl, 
+			cp.prod_id as productId,
+			cp.prod_name as productName,
+			tp.prod_price as productPrice
+		FROM celeb_product cp
+		INNER JOIN tb_product tp
+				ON tp.prod_id = cp.prod_id
+		<where>
+			cp.prog_title = #{searchProgTitle, jdbcType=VARCHAR}
+			AND cp.char_name = (SELECT character_name from celeb_character where prog_title=#{searchProgTitle,jdbcType=VARCHAR} AND name = #{searchCharacterName, jdbcType=VARCHAR})
+			AND cp.prod_type IN 
+		        <foreach collection="searchProdType" item="iProdType"  open="(" close=")" separator=",">
+		            #{iProdType,jdbcType=VARCHAR}
+		        </foreach>
+	     		   
+		</where>
+		LIMIT 20
+ 	</select>	
+
+		<!-- 생필품 api -->
+	<select id="pantryContent" parameterType="map" resultType="prodListVo">
+		SELECT 
+		    tp.shop_code as productType,
+		    tp.prod_id as productId,
+		    tp.prod_img_url_m as imgUrl,
+		    tp.prod_name as productName,
+		    tp.prod_price as productCost,
+		    tp.partner_name as channelName,
+			 '' as channelNo ,
+			tp.brand as brand,
+			tp.logo_url as logoUrl,
+			tp.country_origin as productMake,
+			tp.video_url as videoUrl,
+			'' as airStartTime,
+			'' as airEndTime
+		FROM tb_product tp  
+		INNER JOIN user_pantry up 
+				ON tp.prod_id = up.prod_id
+		WHERE up.user_key = #{userKey,jdbcType=NUMERIC}
+		
+		<if test="pantryCategory != null">
+			AND up.category = #{pantryCategory,jdbcType=VARCHAR}
+		</if>
+		
+		<if test="pantryProduct != null">
+			AND up.prod_brand = #{pantryProduct,jdbcType=VARCHAR}
+		</if>
+		
+		LIMIT 1
+ 	</select>	
+	
+</mapper>

@@ -1,0 +1,323 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+	PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+	"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.kt.ai.commerce.ai.mapper.AiApiMapper">
+	
+	<!-- <delete id="historyDelete_uar" parameterType="map" >
+		DELETE FROM user_ai_result WHERE user_key = #{userKey,jdbcType=VARCHAR} 
+	</delete> -->
+
+	<delete id="historyDelete_uaq" parameterType="map" >
+		DELETE FROM user_ai_qa WHERE user_key = #{userKey,jdbcType=VARCHAR} 
+	</delete>
+
+	<delete id="historyDelete_uac" parameterType="map" >
+		DELETE FROM user_ai_content WHERE user_key = #{userKey,jdbcType=VARCHAR} 
+	</delete>
+
+	<select id="hisList" parameterType="map" resultType="AiVo">
+	   	SELECT 
+	   		 user_ai_session as aiSessionNo 
+	   		, ai_type as aiSessionType
+		FROM public.user_ai_qa
+		WHERE user_key = #{userKey,jdbcType=VARCHAR}
+		GROUP BY user_ai_session, ai_type
+		ORDER BY user_ai_session
+	</select>
+
+	<select id="sessionList" parameterType="map" resultType="SessionVo">
+	   	SELECT ai_no as aiNo
+	   		,qa_type as qaType 
+	   		,answer_msg as answerMsg
+		FROM public.user_ai_qa
+		WHERE user_key = #{userKey,jdbcType=VARCHAR} 
+			AND user_ai_session = #{aiSessionNo,jdbcType=VARCHAR}
+		ORDER BY user_ai_session, ai_no, qaType
+	</select>
+
+	<select id="productListByHist" parameterType="map" resultType="prodListVo">
+		SELECT 	
+			b.prod_id as productId,
+			c.prod_img_url_m as imgUrl,
+			c.prod_name as productName,
+			c.prod_price as productCost,
+			c.prod_url_m as detailUrl ,
+			case when uf.prod_id is null then 'N' else 'Y' end favoriteYn
+		  FROM public.user_ai_qa a
+		  INNER JOIN user_ai_content b 
+		   on a.user_key = b.user_key and a.user_ai_session = b.user_ai_session and a.ai_no = b.ai_no
+		  INNER JOIN tb_product c 
+		   on b.prod_id	= c.prod_id
+		  LEFT JOIN user_favorite uf 
+		   on a.user_key = uf.user_key and c.prod_id = uf.prod_id
+		  where
+		  	a.user_key = #{userKey,jdbcType=VARCHAR} 
+		   and a.user_ai_session = #{aiSessionNo,jdbcType=VARCHAR}	
+		   and a.ai_no = #{aiNo,jdbcType=VARCHAR}
+		   and c.use_yn = 'Y'
+		  order by c.prod_ranking  
+	</select>
+
+	<select id="prodListByOrder" parameterType="map" resultType="prodListVo">
+		 SELECT 	
+			b.prod_id as productId,
+			c.prod_img_url_m as imgUrl,
+			c.prod_name as productName,
+			c.prod_price as productCost,
+			c.prod_url_m as detailUrl,
+			case when f.prod_id is null then 'N' else 'Y' end favoriteYn
+		  FROM public.user_ai_qa a
+		  INNER JOIN user_ai_content b 
+		   on a.user_key = b.user_key and a.user_ai_session = b.user_ai_session and a.ai_no = b.ai_no
+		  INNER JOIN tb_product c 
+		   on b.prod_id	= c.prod_id
+		  LEFT JOIN (
+		  	select prod_id , count(*) as favoriteCount from user_favorite group by prod_id
+		  ) f on b.prod_id = f.prod_id
+		  where 
+		  	a.user_key = #{userKey,jdbcType=VARCHAR} 
+		   and a.user_ai_session = #{aiSessionNo,jdbcType=VARCHAR}
+		   and c.use_yn = 'Y'
+		 <if test="orderType == 'ST001'">
+		  ORDER BY to_number(COALESCE(prod_price,'0'),'999999999')
+		 </if>
+		 <if test="orderType == 'ST002'">
+		  ORDER BY COALESCE(favoriteCount,0) desc
+		 </if>
+		 
+	</select>
+	
+	<select id="sessionMax" parameterType="map" resultType="int">
+		SELECt COALESCE(max(user_ai_session),0)+1 as userAiSession
+		  FROM public.user_ai_qa
+		  where user_key = #{userKey,jdbcType=VARCHAR}
+	</select>
+	
+	<insert id="userAiQaInsert" parameterType="map">
+		INSERT INTO user_ai_qa (user_key , user_ai_session,ai_no,qa_type,answer_msg,answer_code,answer_value,ai_sub_no,ai_type,reg_date)
+		values (#{userKey,jdbcType=NUMERIC},#{aiSessionNo,jdbcType=NUMERIC},#{aiNo,jdbcType=NUMERIC},#{qaType,jdbcType=VARCHAR},#{answerMsg,jdbcType=VARCHAR},#{answerCode,jdbcType=VARCHAR},#{answerValue,jdbcType=VARCHAR},#{aiSubNo,jdbcType=VARCHAR},#{aiType,jdbcType=VARCHAR},now() )
+	</insert>
+	
+	<select id="aiMstSelect" parameterType="map" resultType="UserAiQaVo">
+<![CDATA[	
+		 SELECT 	
+			ai_no as aiNo ,
+			#{userKey,jdbcType=VARCHAR} as userKey ,
+			#{aiSessionNo,jdbcType=VARCHAR} as userAiSession,
+			'A' as qaType ,
+			ai_msg as answerMsg ,
+			ai_sub_no as aiSubNo ,
+			ai_type as aiType ,
+			ai_category as aiCategory ,
+			next_target as nextTarget ,
+			prod_yn as prodYn
+		  FROM ai_mst
+		  WHERE ai_no > #{aiNo,jdbcType=NUMERIC}
+		  AND ai_sub_no = #{aiSubNo,jdbcType=NUMERIC}
+		  AND ai_category = #{aiCategory,jdbcType=VARCHAR}
+]]>	
+		  <if test="aiNo == 2">
+		  AND ai_type = #{answerCode,jdbcType=VARCHAR}
+		  </if>
+		  ORDER BY ai_no 
+		  LIMIT 1	
+	  
+	</select>
+
+	<insert id="serchResultInsert" parameterType="map">
+		INSERT INTO user_ai_content (user_key , user_ai_session,ai_no,qa_type,ai_sub_no,ai_category,prod_id)
+		SELECT #{userKey,jdbcType=NUMERIC},
+			#{aiSessionNo,jdbcType=NUMERIC},
+			#{aiNo,jdbcType=NUMERIC},
+			#{qaType,jdbcType=VARCHAR},
+			#{aiSubNo,jdbcType=NUMERIC},
+			#{aiCategory,jdbcType=VARCHAR},
+			tp.prod_id
+		FROM tb_product tp 
+		<if test="searchColor != null">
+			INNER JOIN 
+			(
+				SELECT prod_id FROM tb_product_color 
+				WHERE color_name IN 
+		        <foreach collection="searchColor" item="iColor"  open="(" close=")" separator=",">
+		            #{iColor,jdbcType=VARCHAR}
+		        </foreach>
+				 
+				GROUP BY prod_id
+			) as tpc
+			ON tp.prod_id = tpc.prod_id
+		</if>
+		<if test="searchStyle != null">
+			
+			INNER JOIN 
+			(
+				SELECT prod_id FROM tb_product_style 
+				WHERE 1=1 AND
+				<foreach collection="searchStyle" item="iStyle"  open="(" close=")" separator="OR">
+		           style_name = #{iStyle,jdbcType=VARCHAR}
+		        </foreach>
+				
+				GROUP BY prod_id
+<![CDATA[				HAVING count(*) >= #{searchStyleCount,jdbcType=NUMERIC} ]]>	
+			) as tps
+			ON tp.prod_id = tps.prod_id
+		</if>
+				 
+		<where>
+		<if test="searchCategory != null">
+			 tp.cate3 =  #{searchCategory,jdbcType=VARCHAR}
+		</if>
+		<if test="searchGender != null">
+			AND tp.gender = #{searchGender,jdbcType=VARCHAR}
+		</if>
+		
+		</where>
+		
+		LIMIT 20
+	</insert>
+
+	<insert id="serchResultInsertKeyWord" parameterType="map">
+		INSERT INTO user_ai_content (user_key , user_ai_session,ai_no,qa_type,ai_sub_no,ai_category,prod_id)
+		SELECT #{userKey,jdbcType=NUMERIC},
+			#{aiSessionNo,jdbcType=NUMERIC},
+			#{aiNo,jdbcType=NUMERIC},
+			#{qaType,jdbcType=VARCHAR},
+			#{aiSubNo,jdbcType=NUMERIC},
+			#{aiCategory,jdbcType=VARCHAR},
+			tp.prod_id
+		FROM tb_product tp 
+		INNER JOIN tb_product_keyword tpk
+		ON tp.prod_id = tpk.prod_id 
+		WHERE tpk.key_word = #{answerMsg,jdbcType=VARCHAR}
+		LIMIT 20
+	</insert>
+	<insert id="userRecommendInsert" parameterType="map">
+		INSERT INTO user_ai_content (user_key , user_ai_session,ai_no,qa_type,ai_sub_no,ai_category,prod_id)
+		SELECT #{userKey,jdbcType=NUMERIC},
+			#{aiSessionNo,jdbcType=NUMERIC},
+			#{aiNo,jdbcType=NUMERIC},
+			#{qaType,jdbcType=VARCHAR},
+			#{aiSubNo,jdbcType=NUMERIC},
+			#{aiCategory,jdbcType=VARCHAR},
+			prod_id
+		FROM service_recommend_result srr INNER JOIN service_recommend sr ON srr.recommend_type = sr.recommend_type AND srr.recommend_ver = sr.recommend_ver
+		WHERE sr.recommend_type = 'APPUSR'
+		AND srr.recommend_id = #{recommendId,jdbcType=VARCHAR}
+		AND sr.use_yn = 'Y'
+		ORDER BY srr.ranking
+		LIMIT 20
+	</insert>
+
+	<insert id="bestRecommendInsert" parameterType="map">
+		INSERT INTO user_ai_content (user_key , user_ai_session,ai_no,qa_type,ai_sub_no,ai_category,prod_id)
+		SELECT #{userKey,jdbcType=NUMERIC},
+			#{aiSessionNo,jdbcType=NUMERIC},
+			#{aiNo,jdbcType=NUMERIC},
+			#{qaType,jdbcType=VARCHAR},
+			#{aiSubNo,jdbcType=NUMERIC},
+			#{aiCategory,jdbcType=VARCHAR},
+			prod_id
+		FROM service_recommend_result srr INNER JOIN service_recommend sr ON srr.recommend_type = sr.recommend_type AND srr.recommend_ver = sr.recommend_ver
+		WHERE sr.recommend_type = 'APPBST'
+		AND srr.recommend_id = #{answerCode,jdbcType=VARCHAR}
+		AND sr.use_yn = 'Y'
+		ORDER BY srr.ranking
+		LIMIT 20
+	</insert>
+	
+	<insert id="talkRecommendInsert" parameterType="map">
+		INSERT INTO user_ai_content (user_key , user_ai_session,ai_no,qa_type,ai_sub_no,ai_category,prod_id)
+		SELECT #{userKey,jdbcType=NUMERIC},
+			#{aiSessionNo,jdbcType=NUMERIC},
+			#{aiNo,jdbcType=NUMERIC},
+			#{qaType,jdbcType=VARCHAR},
+			#{aiSubNo,jdbcType=NUMERIC},
+			#{aiCategory,jdbcType=VARCHAR},
+			tp.prod_id
+		FROM tb_product tp 
+		<if test="aiCategory == '00001'">
+		INNER JOIN 
+		(
+			SELECT prod_id FROM tb_product_color 
+			WHERE color_name = (SELECT dic_result FROM user_ai_result WHERE user_key = #{userKey,jdbcType=VARCHAR} AND user_ai_session = #{aiSessionNo,jdbcType=VARCHAR} and dic_type='color')
+			GROUP BY prod_id
+		) as tpc
+		ON tp.prod_id = tpc.prod_id
+
+		INNER JOIN 
+		(
+			SELECT prod_id FROM tb_product_style 
+			WHERE style_name = (SELECT dic_result FROM user_ai_result WHERE user_key = #{userKey,jdbcType=VARCHAR} AND user_ai_session = #{aiSessionNo,jdbcType=VARCHAR} and dic_type='style')
+			AND style_pos = (SELECT result_pos FROM user_ai_result WHERE user_key = #{userKey,jdbcType=VARCHAR} AND user_ai_session = #{aiSessionNo,jdbcType=VARCHAR} and dic_type='style')
+			GROUP BY prod_id
+		) as tps
+		ON tp.prod_id = tps.prod_id
+		</if>		 
+		WHERE tp.cate3 = (SELECT dic_result FROM user_ai_result WHERE user_key = #{userKey,jdbcType=VARCHAR} AND user_ai_session = #{aiSessionNo,jdbcType=VARCHAR} and dic_type='category3')
+		<if test="aiCategory == '00001'">
+		AND tp.gender = (SELECT dic_result FROM user_ai_result WHERE user_key = #{userKey,jdbcType=VARCHAR} AND user_ai_session = #{aiSessionNo,jdbcType=VARCHAR} and dic_type='gender')
+		</if>
+		LIMIT 20
+	</insert>
+	
+	<select id="aiExList" parameterType="map" resultType="AiExVo">
+		 SELECT 	
+			ai_ex_code as aiExCode ,
+			ai_ex_value as aiExValue ,
+			case when img_use_yn = 'Y' then ai_ex_img else '' end as aiExImgUrl
+		  FROM ai_ex
+		  WHERE   ai_no = #{aiNo,jdbcType=VARCHAR}
+		  AND ai_category = #{aiCategory,jdbcType=VARCHAR}
+		  AND ai_ex_use_yn = 'Y'
+
+		  ORDER BY ai_ex_order 
+	</select>
+	
+	<select id="findDicCount" parameterType="map" resultType="int">
+		SELECT count(*) as findCount
+		FROM tb_dic 		 
+		WHERE dic_type = #{dicType,jdbcType=VARCHAR}
+		AND dic_synonym = #{answerMsg,jdbcType=VARCHAR}
+	</select>
+
+	<insert id="findDic" parameterType="map">
+		INSERT INTO user_ai_result (user_key , user_ai_session,ai_no,ai_sub_no,qa_type,dic_result,result_pos,ai_type,dic_type)
+		SELECT #{userKey,jdbcType=NUMERIC},
+			#{aiSessionNo,jdbcType=NUMERIC},
+			#{aiNo,jdbcType=NUMERIC},
+			#{aiSubNo,jdbcType=NUMERIC},
+			#{qaType,jdbcType=VARCHAR},
+			dic_result ,
+			result_pos,
+			#{aiTypeTk,jdbcType=VARCHAR} ,
+			dic_type
+		FROM tb_dic 		 
+		WHERE dic_type = #{dicType,jdbcType=VARCHAR}
+		AND dic_synonym = #{answerMsg,jdbcType=VARCHAR}
+		group by dic_result,result_pos,dic_type order by count(*) desc limit 1
+		
+	</insert>
+
+	<select id="searchDicList" parameterType="map" resultType="DicVo">
+		 SELECT 	
+			dic_type as dicType
+			,dic_result as dicResult
+			
+		  FROM tb_dic
+		  WHERE dic_synonym in 
+		<foreach collection="searchWord" item="dicWord" open="(" close=")" separator=",">
+            #{dicWord,jdbcType=VARCHAR}
+        </foreach>
+
+		  GROUP BY dic_type, dic_result
+		  ORDER BY count(*) desc
+	</select>
+
+	<insert id="userViewContentInsert" parameterType="map">
+		INSERT INTO user_view_product (user_key , device_type,prod_id,reg_date)
+		values (#{userKey,jdbcType=NUMERIC},#{deviceType,jdbcType=VARCHAR},#{prodId,jdbcType=VARCHAR},now() )
+	</insert>
+	
+</mapper>

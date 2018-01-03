@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+	PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+	"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.kt.ai.web.visual.mapper.WebVisualApiMapper">
+	
+	<select id="selectVisualList" parameterType="map" resultType="WebVisualVo">
+
+		SELECT visual_id as visualId , img_src as visualImgUrl
+		FROM tb_visual_shopping
+		WHERE depth_no = #{depthNo,jdbcType=VARCHAR}
+		AND parents_visual_id = #{parentsVisualId,jdbcType=VARCHAR}
+		ORDER BY visual_id
+	</select>
+
+	<select id="selectVisualResultList" parameterType="map" resultType="prodListVo">
+
+		SELECT tp.prod_id as productId , prod_img_url_m as imgUrl ,prod_name as productName ,prod_price as productCost,prod_url_m as detailUrl
+		, partner_name as channelName , brand , logo_url as logoUrl , company as productMake,case when uf.prod_id is null then 'N' else 'Y' end favoriteYn
+		FROM tb_visual_shopping_result vsr 
+		INNER JOIN tb_product tp 
+		ON vsr.prod_id = tp.prod_id
+		LEFT JOIN (select prod_id from user_favorite where user_key = #{userKey,jdbcType=NUMERIC} ) uf 
+		on tp.prod_id = uf.prod_id
+		WHERE result_id = #{imgIdStr,jdbcType=VARCHAR}
+	</select>
+	
+	<select id="visualMax" parameterType="map" resultType="int">
+		SELECt max(depth_no) as visualMax
+		FROM public.tb_visual_shopping
+	</select>
+	
+	<select id="prodListByRecommDetail" parameterType="map" resultType="prodListVo">
+		SELECT 
+		    tp.shop_code as productType,
+		    tp.prod_id as productId,
+		    tp.prod_img_url_m as imgUrl,
+		    tp.prod_name as productName,
+		    tp.prod_price as productCost,
+		    CASE
+			WHEN tp.shop_code = '7' THEN tv.ch_name 
+			ELSE tp.partner_name
+			END as channelName,
+			CASE 
+			 WHEN tp.shop_code = '7' THEN tv.ch_no 
+			ELSE ''
+			END as channelNo ,
+			tp.brand as brand,
+			tp.logo_url as logoUrl,
+			tp.country_origin as productMake,
+			tp.video_url as videoUrl,
+			tv.start_date as airStartTime,
+			tv.end_date as airEndTime
+			, CASE WHEN tv.start_date > to_char(now(),'YYYY/MM/DD HH24:MI:SS') THEN 'Y' 
+			WHEN tv.start_date is null THEN 'W' 
+			ELSE 'N' END as airReadyYn
+		FROM tb_product tp
+	
+		LEFT JOIN tb_product_tv tv 
+			 ON tp.prod_id = tv.prod_id
+		WHERE  
+		
+		 COALESCE(tv.end_date,'999999999999999') > to_char(now(),'YYYY/MM/DD HH24:MI:SS')
+		AND tp.prod_id = #{prodId,jdbcType=VARCHAR}
+		
+ 	</select>
+	
+</mapper>

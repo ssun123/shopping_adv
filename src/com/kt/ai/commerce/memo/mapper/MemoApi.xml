@@ -1,0 +1,130 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+	PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+	"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.kt.ai.commerce.memo.mapper.MemoApiMapper">
+	
+
+	<!-- 메모 입력/삭제 -->
+	<insert id="memoInsert" parameterType="map">
+		INSERT into user_memo (user_key,category,brand,memo)
+		values(#{userKey,jdbcType=NUMERIC},#{category,jdbcType=VARCHAR},#{brand,jdbcType=VARCHAR},
+		<if test = "category != null and brand != null">
+			#{brand,jdbcType=VARCHAR}||#{category,jdbcType=VARCHAR}
+		</if>
+		<if test = "category != null and brand == null">
+			#{category,jdbcType=VARCHAR}
+		</if>
+		<if test = "category == null and brand != null">
+			#{brand,jdbcType=VARCHAR}
+		</if>
+		)
+	</insert>
+	
+	<!-- 중복삭제 방지위해 memo필드로 삭제 --><!-- 브랜드/카테고리 둘중 하나만 존재할경우 에러 -->
+	<delete id="memoDelete" parameterType="map" > 
+		DELETE from user_memo
+		WHERE user_key = #{userKey,jdbcType=VARCHAR}
+		<if test = "category != null and brand != null">
+			AND brand=#{brand,jdbcType=VARCHAR}
+			AND category=#{category,jdbcType=VARCHAR}
+		</if>
+		<if test = "category != null and brand == null">
+			AND category=#{category,jdbcType=VARCHAR}
+			AND brand is null
+		</if>
+		<if test = "category == null and brand != null">
+			AND brand=#{brand,jdbcType=VARCHAR}
+			AND category is null
+		</if>
+		
+	</delete>
+	<!-- user별 메모 조회-->	
+	<select id="memoList" parameterType="map" resultType="MemoVo">
+		SELECT user_key, memo, category, brand from user_memo
+		where user_key =  #{userKey,jdbcType=VARCHAR}
+		ORDER BY seq desc
+	</select>
+	
+	
+	<!-- 메모상품 조회 -->
+		<select id="memoProdSearch" parameterType="map" resultType="prodListVo">
+		SELECT 
+			tp.prod_id as productId,
+			tp.prod_img_url as imgUrl,
+			tp.prod_url as productUrl,
+			tp.prod_name as productName,
+			tp.prod_price as productCost, 
+			tp.partner_name as partnerName,
+			tp.brand as brand
+		FROM tb_product_list tp 
+		<where> 1=1 
+		<if test="category != null">
+			AND tp.cate3 = #{category,jdbcType=VARCHAR}
+		</if>
+		<if test="brand != null"> 
+			AND tp.brand = #{brand,jdbcType=VARCHAR}
+		</if>		
+		</where>
+		<if test = "sortYn != null"><!-- 최저가 정렬 -->
+			ORDER BY tp.prod_price asc
+		</if>
+		limit 10
+	</select>
+	
+
+	<!-- 단골상품 상품 설정/삭제 -->
+	<insert id="memoProdInsert" parameterType="map">
+		UPDATE user_memo
+		SET prod_id = #{prodId,jdbcType=VARCHAR}
+		WHERE user_key =#{userKey,jdbcType=NUMERIC} 
+			<if test = "category != null and brand != null">
+			AND brand=#{brand,jdbcType=VARCHAR}
+			AND category=#{category,jdbcType=VARCHAR}
+		</if>
+		<if test = "category != null and brand == null">
+			AND category=#{category,jdbcType=VARCHAR}
+			AND brand is null
+		</if>
+		<if test = "category == null and brand != null">
+			AND brand=#{brand,jdbcType=VARCHAR}
+			AND category is null
+		</if>
+	</insert>
+	
+	<delete id="memoProdDelete" parameterType="map" >
+		UPDATE user_memo
+		SET prod_id = NULL
+		WHERE user_key =#{userKey,jdbcType=NUMERIC} 
+			<if test = "category != null and brand != null">
+			AND brand=#{brand,jdbcType=VARCHAR}
+			AND category=#{category,jdbcType=VARCHAR}
+		</if>
+		<if test = "category != null and brand == null">
+			AND category=#{category,jdbcType=VARCHAR}
+			AND brand is null
+		</if>
+		<if test = "category == null and brand != null">
+			AND brand=#{brand,jdbcType=VARCHAR}
+			AND category is null
+		</if>
+	</delete>
+	
+	<!-- 단골상품 조회 -->	
+	<select id="memoProdList" parameterType="map" resultType="prodListVo">
+		SELECT 
+			tp.prod_id as productId,
+			tp.prod_img_url as imgUrl,
+			tp.prod_name as productName,
+			tp.prod_price as productCost, 
+			tp.partner_name as partnerName,
+			um.memo as memo
+		FROM tb_product_list tp 
+		INNER JOIN user_memo um
+				ON tp.prod_id = um.prod_id
+		WHERE um.user_key = #{userKey,jdbcType=NUMERIC}
+		
+	</select>
+				
+</mapper>
